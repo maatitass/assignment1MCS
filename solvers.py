@@ -31,8 +31,8 @@ def jacobi(A: Any, b: np.ndarray, tol: float, max_iter: int = 20000) -> SolverRe
 
     iterations = 0
     while residual_relative >= tol and iterations < max_iter:
-        ax = A @ x
-        x = x + (b - ax) / diag
+        # residual e' gia' b - A @ x dal controllo precedente: un solo matvec per iterazione.
+        x = x + residual / diag
         iterations += 1
         residual = b - A @ x
         residual_relative = np.linalg.norm(residual) / b_norm
@@ -49,6 +49,7 @@ def jacobi(A: Any, b: np.ndarray, tol: float, max_iter: int = 20000) -> SolverRe
 
 def gauss_seidel(A: Any, b: np.ndarray, tol: float, max_iter: int = 20000) -> SolverResult:
     _validate_for_iteration(A)
+    diag = np.asarray(A.diagonal(), dtype=float)
     x = np.zeros_like(b, dtype=float)
     b_norm = _safe_norm(b)
 
@@ -58,7 +59,7 @@ def gauss_seidel(A: Any, b: np.ndarray, tol: float, max_iter: int = 20000) -> So
 
     iterations = 0
     while residual_relative >= tol and iterations < max_iter:
-        _gauss_seidel_step(A, b, x)
+        _gauss_seidel_step(A, b, x, diag)
         iterations += 1
         residual = b - A @ x
         residual_relative = np.linalg.norm(residual) / b_norm
@@ -154,22 +155,15 @@ SOLVERS: tuple[Callable[[Any, np.ndarray, float, int], SolverResult], ...] = (
 )
 
 
-def _gauss_seidel_step(A: Any, b: np.ndarray, x: np.ndarray) -> None:
+def _gauss_seidel_step(A: Any, b: np.ndarray, x: np.ndarray, d: np.ndarray) -> None:
+    # d = A.diagonal(), precalcolata una volta (diagonale gia' validata non nulla).
+    indptr, indices, data = A.indptr, A.indices, A.data
     for i in range(A.shape[0]):
-        start = A.indptr[i]
-        end = A.indptr[i + 1]
-        diag = 0.0
-        sigma = 0.0
-        for idx in range(start, end):
-            j = A.indices[idx]
-            aij = A.data[idx]
-            if j == i:
-                diag = aij
-            else:
-                sigma += aij * x[j]
-        if diag == 0:
-            raise ValueError("La matrice ha almeno un elemento diagonale nullo")
-        x[i] = (b[i] - sigma) / diag
+        start = indptr[i]
+        end = indptr[i + 1]
+        # sigma include a_ii * x_i (valore vecchio): lo si rimuove con d[i] * x[i].
+        sigma = data[start:end] @ x[indices[start:end]]
+        x[i] = (b[i] - (sigma - d[i] * x[i])) / d[i]
 
 
 def _validate_for_iteration(A: Any) -> None:
