@@ -10,3 +10,12 @@ __pycache__/
 .ruff_cache/
 
 results/*-test/
+
+# LaTeX build artifacts (il PDF viene comunque versionato)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
