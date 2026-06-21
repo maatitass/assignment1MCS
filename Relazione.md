@@ -279,7 +279,161 @@ Gradiente semplice è penalizzato quando la matrice è mal condizionata (effetto
 
 ---
 
-## 5. Come eseguire
+## 5. Domande d'esame anticipate (Q&A)
+
+Raccolta delle domande che il docente può porre all'orale, con risposta sintetica
+e puntatori al codice. Servono a difendere ogni scelta progettuale.
+
+### A. Vincoli della consegna
+
+**Q — Python è ammesso?**
+Sì: la consegna elenca esplicitamente «C++, Fortran, Java, **Python**, etc.».
+
+**Q — Avete usato un solutore già pronto (vietato dalla consegna)?**
+No. `scipy`/`numpy` sono usati **solo** per le strutture dati (lettura `.mtx`,
+matrice sparsa CSR) e le operazioni elementari (prodotto matrice-vettore `A@x`,
+prodotto scalare, norma). I quattro algoritmi sono scritti interamente in
+`solvers.py`. Non si usano `scipy.sparse.linalg.cg`, `spsolve`, `numpy.linalg.solve`
+o simili. Questo è esattamente il caso «la libreria di base fornisce *solamente*
+la struttura dati» richiesto al punto (a).
+
+**Q — Perché `A@x` è lecito e un solver no?**
+`A@x` è un'**operazione elementare** fra matrice e vettore (la "moltiplicazione"),
+non la *risoluzione* di un sistema. La consegna vieta i metodi che risolvono
+`A x = b`, non l'aritmetica di base.
+
+**Q — Il vettore iniziale è davvero nullo? E il criterio di arresto?**
+Sì: `x⁽⁰⁾ = 0` ([solvers.py](solvers.py), riga 97). Il criterio è il residuo
+scalato `‖b − A x⁽ᵏ⁾‖/‖b‖ < tol` (riga 104), più il controllo `k < max_iter` con
+`max_iter = 20000` e flag `converged = False` se lo si supera — esattamente i
+punti (b) della consegna.
+
+**Q — Perché `x = [1,…,1]` e `b = A x`?**
+È la procedura di validazione standard richiesta (step 1–4): scegliendo la
+soluzione esatta nota `x`, si può misurare l'**errore vero** `‖x_calc − x‖/‖x‖`,
+cosa impossibile in un problema reale dove la soluzione non si conosce. Nota:
+`b = A·ones` è semplicemente il vettore delle **somme di riga** di `A`.
+
+### B. Architettura e implementazione
+
+**Q — Perché non quattro funzioni separate?**
+Perché la consegna «valuta positivamente» un'architettura coesa. Tutti i metodi
+condividono lo stesso scheletro (ciclo + criterio d'arresto + misure) e
+differiscono solo nel passo `x⁽ᵏ⁾ → x⁽ᵏ⁺¹⁾`. Lo scheletro è scritto **una volta
+sola** in `IterativeSolver.solve()`; ogni metodo è una classe con la sola regola
+di aggiornamento (pattern *template method*). Aggiungere un quinto metodo = una
+sola classe nuova.
+
+**Q — Perché Gauss-Seidel è compilato con numba e gli altri no?**
+Il passo di Gauss-Seidel è una *sweep* sequenziale (la sostituzione in avanti:
+`x[i]` dipende da `x[0..i-1]` appena calcolati) e quindi **non è vettorizzabile**
+con numpy: in puro Python sarebbe un ciclo lentissimo. numba lo compila a codice
+macchina mantenendolo **codice nostro** (non è una libreria di solver). Jacobi,
+Gradiente e CG invece si esprimono già con operazioni vettoriali numpy efficienti
+e non hanno bisogno di numba.
+
+**Q — Cos'è il warm-up e perché c'è?**
+La prima chiamata a una funzione numba paga (una tantum) il costo di
+compilazione JIT. Il `warmup()` la forza su un problemino 3×3 **prima** delle
+misure di tempo, così il tempo riportato per Gauss-Seidel non include la
+compilazione ed è confrontabile con gli altri.
+
+**Q — Un prodotto matrice-vettore per iterazione: come?**
+Per Gradiente e CG il residuo successivo si ottiene per **ricorrenza**
+`r⁽ᵏ⁺¹⁾ = r⁽ᵏ⁾ − α·(A v)`, riusando il prodotto `A v` già calcolato per il passo,
+invece di ricalcolare `b − A x⁽ᵏ⁺¹⁾` (che costerebbe un secondo matvec).
+
+**Q — Verificate che la matrice sia davvero SPD?**
+No, e va detto onestamente: `_validate_for_iteration` controlla solo che `A` sia
+**quadrata** e con **diagonale non nulla** (riga 296). La simmetria e la
+definita-positività sono **assunte** per ipotesi della consegna (le quattro
+matrici fornite lo sono). Se servisse verificarle: la simmetria con
+`‖A − Aᵀ‖ ≈ 0`; la definita-positività tentando una **fattorizzazione di
+Cholesky** (riesce ⟺ SPD) oppure controllando che tutti gli autovalori siano
+positivi (è ciò che fa `analyze_cond.py` stimando `λ_min > 0`).
+
+### C. Teoria dei metodi
+
+**Q — Qual è lo "splitting" `A = P − N` di Jacobi e Gauss-Seidel?**
+Jacobi: `P = D` (diagonale). Gauss-Seidel: `P = D + L` (triangolare inferiore).
+In entrambi il passo è `x⁽ᵏ⁺¹⁾ = x⁽ᵏ⁾ + P⁻¹ r⁽ᵏ⁾`. Vedi `Teoria.md` §4–5.
+
+**Q — La sola SPD non garantisce la convergenza di Jacobi: perché qui converge?**
+Vero: Jacobi converge ⟺ il raggio spettrale `ρ(D⁻¹(L+U)) < 1`, e la sola SPD non
+lo assicura (una condizione sufficiente è che anche `2D − A` sia SPD, oppure la
+dominanza diagonale). **Empiricamente** su tutte e quattro le matrici Jacobi
+converge → significa che per queste matrici quella condizione è soddisfatta
+(le `spa` sono fortemente dominanti diagonali, e anche sulle `vem` `ρ < 1`).
+Gauss-Seidel invece, essendo `A` SPD, converge **sempre** per teorema.
+
+**Q — Perché Gauss-Seidel ≈ metà delle iterazioni di Jacobi?**
+Perché riusa **immediatamente** le componenti appena aggiornate (informazione
+"più fresca"), facendo più lavoro utile per iterazione. Confermato dai dati: vem2
+@1e-8, Jacobi 5425 vs GS 2714 iter (rapporto ≈ 2.0).
+
+**Q — Risolvere = minimizzare: perché vale solo se `A` è SPD?**
+Perché `φ(y) = ½ yᵀA y − bᵀy` ha gradiente `∇φ = A y − b`, che si annulla in
+`A y = b`; ed è un **minimo** (la "ciotola" è rivolta verso l'alto con un solo
+fondo) **solo se `A` è definita positiva**. Se `A` non fosse SPD, `φ` potrebbe
+avere una sella o nessun minimo e i metodi del gradiente non sarebbero ben posti.
+
+**Q — Cos'è lo zig-zag del Gradiente e da cosa dipende la sua velocità?**
+La direzione di massima discesa punta verso la parete più vicina della valle, non
+verso il fondo: su valli strette (mal condizionate) si rimbalza da una parete
+all'altra. La velocità dipende dal **numero di condizionamento** `cond(A)`. Per
+questo il Gradiente è lentissimo sulle `spa` (`cond ≈ 2·10³`): fino a ~12 900 iter.
+
+**Q — Perché il Gradiente coniugato è così veloce? Direzioni A-coniugate?**
+Le direzioni sono **A-coniugate** (`dᵢᵀ A dⱼ = 0` per `i≠j`): una volta ottimizzata
+una direzione non la si "rovina" più, niente zig-zag. Teorema: per `A` SPD `n×n`,
+CG arriva alla soluzione esatta in **al più `n` iterazioni**; in pratica, grazie
+al raggruppamento degli autovalori, ne bastano molte meno (qui 38–240). Il numero
+di iterazioni scala come `√cond(A)`.
+
+### D. Risultati numerici (anomalie da spiegare)
+
+**Q — Residuo piccolo ma errore più grande: perché?**
+Vale `errore relativo ≲ cond(A) · residuo scalato`. A parità di `tol`, l'errore
+sulla soluzione dipende dal condizionamento: su spa1 @1e-6 il Gradiente ha errore
+~10⁻³ (≈ 1000× il residuo imposto). Il residuo che imponiamo **non** è l'errore.
+
+**Q — Su `vem`, Gauss-Seidel non è più veloce di Jacobi in tempo, pur facendo
+metà iterazioni: perché?**
+Perché il singolo passo di GS (sweep sequenziale) è più costoso del passo di
+Jacobi (vettoriale/parallelizzabile): sulle `vem` molto sparse i due effetti si
+compensano e i tempi totali si equivalgono. Sulle `spa`, dove GS converge in
+pochissime iterazioni, GS torna nettamente più rapido.
+
+**Q — Per CG e Gradiente il residuo del criterio d'arresto è quello "vero"?**
+È il residuo calcolato **per ricorrenza** (`r ← r − α A v`), non ricalcolato come
+`b − A x` ad ogni passo (scelta fatta per risparmiare un matvec). Su queste
+matrici e tolleranze la differenza con il residuo vero è trascurabile; se si
+volesse il residuo esatto nel test, basterebbe ricalcolarlo al costo di un matvec
+in più. Jacobi e Gauss-Seidel usano invece il residuo vero `b − A x` ad ogni passo.
+
+**Q — Tutti convergono: allora i metodi sono equivalenti?**
+No. Convergono tutti entro `max_iter` perché le matrici sono "trattabili", ma con
+costi diversissimi: su spa2 @1e-10 il Gradiente impiega ~51 s e ~8300 iter, CG
+~1.2 s e 240 iter. CG è la scelta migliore in ogni scenario; tra gli stazionari
+GS domina Jacobi; il Gradiente è penalizzato dal mal condizionamento.
+
+### E. Test "on-the-fly"
+
+**Q — Sapete lanciare il codice su un'altra matrice / un'altra tolleranza
+all'istante? (lo prevede la consegna)**
+Sì. La CLI accetta `--matrix` e `--tol` ripetibili:
+
+```bash
+python run_assignment.py --matrix dati/vem1.mtx --tol 1e-8
+python run_assignment.py --matrix /percorso/altra.mtx --tol 1e-5 --tol 1e-7
+```
+
+Si può anche isolare un singolo metodo con `--method` e saltare i grafici con
+`--no-plots`. Funziona con qualunque `.mtx` SPD passato dal docente.
+
+---
+
+## 6. Come eseguire
 
 Requisiti: `pip install -r requirements.txt` (numpy, scipy, numba, matplotlib).
 
@@ -303,7 +457,7 @@ python analyze_cond.py
 
 ---
 
-## 6. Conclusioni
+## 7. Conclusioni
 
 La libreria implementa i quattro metodi richiesti con un'architettura coesa
 (classe base con lo scheletro comune + una classe per metodo con la sola regola
