@@ -9,7 +9,7 @@ import numpy as np
 from scipy.io import mmread
 from scipy.sparse import diags
 
-from solvers import SOLVERS, conjugate_gradient
+from solvers import SOLVERS, ConjugateGradient
 
 
 def test_scipy_reads_matrix_market() -> None:
@@ -38,17 +38,17 @@ def test_solvers_on_tridiagonal_spd() -> None:
     b = A @ x_exact
 
     for solver in SOLVERS:
-        result = solver(A, b, tol=1e-8, max_iter=20000)
+        result = solver.solve(A, b, tol=1e-8, max_iter=20000)
         relative_error = np.linalg.norm(x_exact - result.x) / np.linalg.norm(x_exact)
-        assert result.converged, solver.__name__
-        assert relative_error < 1e-6, solver.__name__
+        assert result.converged, solver.name
+        assert relative_error < 1e-6, solver.name
 
 
 def test_conjugate_gradient_is_fast_on_small_matrix() -> None:
     A = _tridiagonal_spd(20)
     x_exact = np.ones(20)
     b = A @ x_exact
-    result = conjugate_gradient(A, b, tol=1e-10, max_iter=20000)
+    result = ConjugateGradient().solve(A, b, tol=1e-10, max_iter=20000)
     assert result.converged
     assert result.iterations <= 20
 

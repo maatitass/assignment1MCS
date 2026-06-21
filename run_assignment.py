@@ -10,12 +10,12 @@ import numpy as np
 from scipy.io import mmread
 
 from plot_results import create_plots
-from solvers import SOLVERS
+from solvers import SOLVERS, warmup
 
 
 DEFAULT_TOLS = (1e-4, 1e-6, 1e-8, 1e-10)
 DEFAULT_MAX_ITER = 20000
-METHOD_NAMES = tuple(solver.__name__.replace("_", "-") for solver in SOLVERS)
+METHOD_NAMES = tuple(solver.key for solver in SOLVERS)
 
 
 def main() -> None:
@@ -30,6 +30,8 @@ def main() -> None:
     tolerances = args.tol if args.tol else list(DEFAULT_TOLS)
     solvers = _select_solvers(args.method)
 
+    warmup()  # compilazione JIT (numba) prima delle misure di tempo
+
     rows: list[dict[str, str]] = []
     for matrix_path in matrix_paths:
         print(f"\nMatrice: {matrix_path}")
@@ -40,7 +42,7 @@ def main() -> None:
         for tol in tolerances:
             print(f"  tol = {tol:g}")
             for solver in solvers:
-                result = solver(A, b, tol, args.max_iter)
+                result = solver.solve(A, b, tol, args.max_iter)
                 relative_error = np.linalg.norm(x_exact - result.x) / np.linalg.norm(x_exact)
                 row = {
                     "matrix": matrix_path.name,
@@ -144,8 +146,8 @@ def _select_solvers(methods: list[str] | None):
     if not methods:
         return SOLVERS
 
-    selected_names = {method.replace("-", "_") for method in methods}
-    return tuple(solver for solver in SOLVERS if solver.__name__ in selected_names)
+    selected = set(methods)
+    return tuple(solver for solver in SOLVERS if solver.key in selected)
 
 
 def _write_csv(rows: list[dict[str, str]], csv_path: Path) -> None:

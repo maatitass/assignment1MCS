@@ -11,7 +11,9 @@ La matrice viene letta da file MatrixMarket `.mtx`, il vettore esatto e'
 `x = ones(n)`, il termine noto e' `b = A x`, e ogni metodo parte da `x0 = 0`.
 SciPy viene usato solo per leggere i file `.mtx`, conservare le matrici in
 formato sparso CSR e fare i prodotti matrice-vettore. I quattro metodi iterativi
-sono implementati direttamente nel file `solvers.py`.
+sono implementati direttamente nel file `solvers.py`. La sola sweep di
+Gauss-Seidel (sostituzione in avanti, intrinsecamente sequenziale) e' compilata
+con `numba` per renderla veloce, restando comunque codice nostro.
 
 Il criterio di arresto e' quello del testo:
 
@@ -29,7 +31,7 @@ python -m pip install -r requirements.txt
 
 ## Esecuzione completa
 
-Dalla cartella `assignment 1`:
+Dalla cartella del progetto:
 
 ```bash
 python run_assignment.py
@@ -81,3 +83,20 @@ python test_assignment.py
 I test controllano parser MatrixMarket, convergenza su matrice tridiagonale
 tramite SciPy, convergenza su matrice tridiagonale SPD, e gradiente coniugato
 in al piu' `n` iterazioni su un sistema piccolo.
+
+## Numeri di condizionamento
+
+```bash
+python analyze_cond.py
+```
+
+Stima `lambda_min`, `lambda_max` e `cond(A)` per ogni matrice in `dati/`
+(serve solo ai commenti della relazione, non fa parte dei solutori).
+
+## Documenti
+
+- `Teoria.md` — la teoria dietro i quattro metodi, spiegata in modo semplice
+  (criterio di arresto, splitting, interpretazione come minimizzazione,
+  zig-zag del gradiente, direzioni A-coniugate).
+- `Relazione.md` — struttura della libreria, tabelle dei risultati, grafici e
+  commenti.
