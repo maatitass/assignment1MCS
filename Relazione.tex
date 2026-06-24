@@ -22,104 +22,236 @@
 % ------------------------------------------------------------------
 % Stile per i blocchi di codice / pseudocodice
 % ------------------------------------------------------------------
-\definecolor{codebg}{rgb}{0.96,0.96,0.96}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
 \definecolor{codekw}{rgb}{0.10,0.30,0.65}
 \definecolor{codecm}{rgb}{0.35,0.55,0.35}
+\definecolor{codest}{rgb}{0.55,0.10,0.55}
+\definecolor{codenum}{rgb}{0.45,0.45,0.45}
 \lstset{
   basicstyle=\ttfamily\small,
   backgroundcolor=\color{codebg},
   keywordstyle=\color{codekw}\bfseries,
   commentstyle=\color{codecm}\itshape,
-  stringstyle=\color{purple},
+  stringstyle=\color{codest},
+  numberstyle=\ttfamily\footnotesize\color{codenum},
   showstringspaces=false,
   breaklines=true,
   frame=single,
   framerule=0pt,
   rulecolor=\color{codebg},
-  xleftmargin=8pt,
+  xleftmargin=10pt,
   xrightmargin=8pt,
   aboveskip=8pt,
   belowskip=8pt,
   literate=%
     {à}{{\`a}}1 {è}{{\`e}}1 {é}{{\'e}}1 {ì}{{\`i}}1 {ò}{{\`o}}1 {ù}{{\`u}}1
-    {⁻}{{$^{-}$}}1
+    {⁻}{{$^{-}$}}1 {·}{{$\cdot$}}1
 }
 \lstdefinestyle{py}{language=Python}
+% Stile per i listati dell'appendice: numeri di riga a sinistra
+\lstdefinestyle{pyfull}{language=Python,numbers=left,numbersep=8pt}
 
 % comando per intestazioni di colonna allineate a destra
 \newcolumntype{R}{>{\raggedleft\arraybackslash}p{1.7cm}}
 
-\title{\textbf{Mini libreria per sistemi lineari}\\[2pt]
-\large Solutori iterativi per matrici simmetriche e definite positive}
-\author{Metodi del Calcolo Scientifico --- AA 2025--2026\\Progetto 1 (alternativo)}
-\date{}
-
 \begin{document}
-\maketitle
 
-\begin{abstract}
-\noindent
-Implementazione e validazione di quattro solutori iterativi --- Jacobi,
-Gauss--Seidel, Gradiente e Gradiente coniugato --- per sistemi lineari
-$A\mathbf{x}=\mathbf{b}$ con $A$ simmetrica e definita positiva (SPD).
-La libreria è scritta in \textbf{Python}: per le sole strutture dati (matrice
-sparsa CSR, vettori) e le operazioni elementari ($A\mathbf{v}$, prodotto
-scalare, norma) ci si appoggia a \texttt{scipy.sparse}/\texttt{numpy}, mentre
-gli algoritmi risolutivi sono interamente sviluppati nel progetto. La
-validazione segue la procedura standard (soluzione esatta nota $\mathbf{x}=
-[1,\dots,1]$, $\mathbf{b}=A\mathbf{x}$, $\mathbf{x}^{(0)}=\mathbf{0}$) sulle
-quattro matrici fornite e sulle tolleranze $\{10^{-4},10^{-6},10^{-8},
-10^{-10}\}$.
-\end{abstract}
+% ==================================================================
+% Frontespizio in stile dipartimento
+% ==================================================================
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\large Università degli Studi di Milano Bicocca\par}
+{\large Scuola di Scienze\par}
+{\large Dipartimento di Informatica, Sistemistica e Comunicazione\par}
+\vspace{0.8cm}
+{\large Metodi del Calcolo Scientifico\par}
+
+\vspace{2.2cm}
+{\Huge\bfseries Progetto 1\par}
+\vspace{0.6cm}
+{\Large Solutori iterativi per sistemi lineari simmetrici e definiti positivi\par}
+
+\vspace{2.2cm}
+\rule{0.55\textwidth}{0.4pt}\par
+\vspace{0.6cm}
+{\large\bfseries Relazione\par}
+\vspace{0.6cm}
+
+\vspace{1.6cm}
+{\large Matias Bonoli\par}
+
+\vfill
+{\large Anno Accademico 2025--2026\par}
+\vspace{0.3cm}
+{\large 24 giugno 2026\par}
+\end{titlepage}
 
 \tableofcontents
-\bigskip
-\hrule
-\bigskip
+\newpage
 
 % ==================================================================
-\section{Struttura della libreria}
+\section{Introduzione}
+% ==================================================================
+L'obiettivo principale di questo progetto è lo studio e l'implementazione pratica
+dei principali \emph{metodi iterativi} per la risoluzione di sistemi lineari
+$A\mathbf{x}=\mathbf{b}$, nel caso in cui la matrice $A$ sia simmetrica e definita
+positiva (SPD). Il lavoro che abbiamo svolto si articola in due fasi principali.
+
+Nella prima parte abbiamo curato l'inquadramento algoritmico dei quattro metodi
+richiesti dalla traccia --- Jacobi, Gauss--Seidel, Gradiente e Gradiente
+coniugato --- partendo dalla loro derivazione teorica (lo \emph{splitting}
+$A=P-N$ per i metodi stazionari e l'interpretazione come problema di minimo per i
+metodi del gradiente) e fissando il criterio di arresto e la procedura di
+validazione comune a tutti.
+
+Nella seconda parte abbiamo sviluppato una piccola \emph{libreria} che implementa
+concretamente questi algoritmi. Abbiamo scelto un'architettura coesa, in cui lo
+scheletro di iterazione è scritto una sola volta e ogni metodo fornisce soltanto
+la propria regola di aggiornamento, e abbiamo dotato il progetto di un eseguibile
+da riga di comando che, su un insieme di matrici reali, misura per ciascun metodo
+il numero di iterazioni, l'errore di ricostruzione e i tempi di calcolo al
+variare della tolleranza richiesta.
+
+\subsection{Linguaggio e dipendenze}
+Il progetto è interamente scritto in \textbf{Python 3.12}. Tutti i pacchetti
+utilizzati sono \emph{open source}:
+\begin{itemize}[leftmargin=1.6em]
+  \item \texttt{numpy}: gestione di array e operazioni vettoriali (prodotto
+  scalare, norma euclidea, aggiornamenti elemento per elemento);
+  \item \texttt{scipy.sparse}: struttura dati per la matrice in formato sparso
+  CSR e prodotto matrice--vettore $A\mathbf{v}$;
+  \item \texttt{scipy.io.mmread}: lettura dei file in formato MatrixMarket
+  \texttt{.mtx};
+  \item \texttt{numba}: compilazione JIT della sola \emph{sweep} di
+  Gauss--Seidel (intrinsecamente sequenziale), per renderla veloce restando
+  codice nostro;
+  \item \texttt{matplotlib}: generazione dei grafici di sintesi;
+  \item \texttt{scipy.sparse.linalg.eigsh}: usato \emph{solo} nello script di
+  analisi a margine, per stimare gli autovalori estremi e quindi
+  $\mathrm{cond}(A)$ ai fini dei commenti (non fa parte dei solutori).
+\end{itemize}
+
+È importante sottolineare che, come consentito esplicitamente dalla consegna,
+\texttt{scipy}/\texttt{numpy} sono usati \textbf{esclusivamente} per le strutture
+dati e le operazioni elementari: \textbf{gli algoritmi risolutivi sono
+interamente sviluppati nel progetto}. Non viene usato alcun solutore di sistemi
+lineari di libreria (niente \texttt{spsolve}, \texttt{cg},
+\texttt{numpy.linalg.solve} e simili).
+
+% ==================================================================
+\section{PARTE 1}
 % ==================================================================
 
-Il progetto è scritto in \textbf{Python}. Per le sole \textbf{strutture dati}
-(matrice sparsa CSR, vettori) e le \textbf{operazioni elementari} (prodotto
-matrice--vettore $A\mathbf{v}$, prodotto scalare, norma) ci si appoggia a
-\texttt{scipy.sparse}/\texttt{numpy}, come consentito esplicitamente dalla
-consegna. \textbf{Gli algoritmi risolutivi sono interamente implementati nel
-progetto} (file \texttt{solvers.py}): non viene usato alcun solutore di sistemi
-lineari di \texttt{scipy}/\texttt{numpy} (niente \texttt{spsolve},
-\texttt{cg}, \texttt{numpy.linalg.solve}, ecc.).
+\subsection{I quattro metodi e il criterio di arresto}
+Tutti i metodi che abbiamo implementato assumono $A$ \textbf{SPD}
+($A=A^{\mathsf{T}}$ e $\mathbf{v}^{\mathsf{T}}A\mathbf{v}>0$ per ogni
+$\mathbf{v}\neq\mathbf{0}$) e partono dallo stesso vettore iniziale nullo
+$\mathbf{x}^{(0)}=\mathbf{0}$. Indichiamo con
+\[
+  \mathbf{r}^{(k)}=\mathbf{b}-A\mathbf{x}^{(k)}
+\]
+il residuo alla generica iterazione $k$. Il criterio di arresto, comune a tutti i
+metodi e richiesto dalla traccia, è formulato sul \textbf{residuo scalato}:
+\[
+  \frac{\lVert\mathbf{b}-A\mathbf{x}^{(k)}\rVert}{\lVert\mathbf{b}\rVert}
+  < \texttt{tol}.
+\]
+A protezione dei casi di non convergenza, l'iterazione si arresta comunque al
+superamento di un numero massimo di passi $\texttt{max\_iter}=20000$, segnalando
+in tal caso $\texttt{converged}=\text{False}$.
 
-\begin{lstlisting}
-assignment1MCS/
-  solvers.py          # i 4 metodi + criterio di arresto + sweep GS (numba)
-  run_assignment.py   # eseguibile: matrici + tolleranze -> risultati + CSV
-  plot_results.py     # generazione grafici
-  test_assignment.py  # test automatici
-  analyze_cond.py     # stima di cond(A) (solo per i commenti)
-  dati/               # spa1, spa2, vem1, vem2 (.mtx)
-  results/            # results.csv + plots/*.png
-  Teoria.md           # documento teorico divulgativo
-  Relazione.tex       # questo documento
-  README.md
-\end{lstlisting}
+\subsection{Metodi stazionari: lo splitting \texorpdfstring{$A=P-N$}{A=P-N}}
+L'idea alla base dei metodi stazionari è spezzare $A=P-N$ con $P$ facile da
+invertire; il sistema diventa l'iterazione di punto fisso
+\[
+  \mathbf{x}^{(k+1)} = \mathbf{x}^{(k)} + P^{-1}\mathbf{r}^{(k)} .
+\]
+Un principio centrale che governa la convergenza è il seguente: il metodo
+converge per ogni $\mathbf{x}^{(0)}$ \emph{se e solo se} il raggio spettrale
+della \emph{matrice di iterazione} $B=P^{-1}N$ soddisfa $\rho(B)<1$. Quanto più
+piccolo è $\rho(B)$, tanto più rapidamente l'errore viene abbattuto.
 
-\subsection{Architettura}
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{Jacobi}: scegliamo $P=D$ (la diagonale di $A$). L'inversa
+  $D^{-1}$ è banale (i reciproci degli elementi diagonali), quindi il passo è
+  completamente vettoriale e parallelizzabile. La sola ipotesi SPD \emph{non}
+  garantisce $\rho(B)<1$ (una condizione sufficiente è che anche $2D-A$ sia SPD,
+  oppure la dominanza diagonale di $A$).
+  \item \textbf{Gauss--Seidel}: scegliamo $P=D+L$ (la parte triangolare
+  inferiore di $A$). Riusando immediatamente le componenti appena aggiornate, di
+  norma servono \emph{circa la metà} delle iterazioni di Jacobi. Inoltre, se $A$
+  è SPD, Gauss--Seidel converge \textbf{sempre}. Il prezzo è che il passo è una
+  sostituzione in avanti, intrinsecamente sequenziale.
+\end{itemize}
 
-La libreria \textbf{non è una sequenza di funzioni indipendenti}, ma una piccola
-gerarchia di classi coesa, costruita su un'osservazione: tutti i metodi
-condividono lo stesso scheletro e differiscono \emph{solo} nel passo di
-aggiornamento $\mathbf{x}^{(k)}\to\mathbf{x}^{(k+1)}$.
+\subsection{Metodi del gradiente: risolvere equivale a minimizzare}
+Per $A$ SPD, risolvere $A\mathbf{x}=\mathbf{b}$ equivale a minimizzare il
+funzionale quadratico
+\[
+  \varphi(\mathbf{y}) = \tfrac12\,\mathbf{y}^{\mathsf{T}}A\mathbf{y}
+                        - \mathbf{b}^{\mathsf{T}}\mathbf{y},
+  \qquad
+  \nabla\varphi(\mathbf{y}) = A\mathbf{y}-\mathbf{b},
+\]
+il cui gradiente si annulla esattamente in $A\mathbf{y}=\mathbf{b}$. Proprio
+perché $A$ è definita positiva, $\varphi$ è un paraboloide a ``ciotola'' e quel
+punto stazionario è un minimo.
 
-\begin{itemize}[leftmargin=1.4em]
-  \item \textbf{\texttt{IterativeSolver}} (classe base astratta) implementa
-  \textbf{una sola volta} lo scheletro comune nel metodo \texttt{solve()}:
-  vettore iniziale nullo $\mathbf{x}^{(0)}=\mathbf{0}$; ciclo che si arresta
-  quando il residuo scalato $\lVert\mathbf{b}-A\mathbf{x}^{(k)}\rVert/
-  \lVert\mathbf{b}\rVert<\texttt{tol}$, oppure quando si superano
-  \texttt{max\_iter} iterazioni (segnalando la non convergenza); validazione,
-  misura del tempo, costruzione del risultato.
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{Gradiente} (\emph{steepest descent}): a ogni passo ci si muove
+  nella direzione dell'antigradiente $-\nabla\varphi=\mathbf{r}^{(k)}$, con il
+  passo ottimo lungo quella retta
+  \[
+    \alpha_k = \frac{\mathbf{r}^{(k)}\!\cdot\mathbf{r}^{(k)}}
+                    {\mathbf{r}^{(k)}\!\cdot A\mathbf{r}^{(k)}},
+    \qquad
+    \mathbf{x}^{(k+1)}=\mathbf{x}^{(k)}+\alpha_k\mathbf{r}^{(k)}.
+  \]
+  Il metodo converge sempre per $A$ SPD, ma sulle matrici mal condizionate la
+  direzione di massima discesa non punta verso il fondo della valle: si genera il
+  caratteristico \emph{zig-zag} e la velocità degrada con il numero di
+  condizionamento $\mathrm{cond}(A)=\lambda_{\max}/\lambda_{\min}$.
+  \item \textbf{Gradiente coniugato} (CG): le direzioni di ricerca sono
+  $A$-coniugate ($\mathbf{d}_i^{\mathsf{T}}A\mathbf{d}_j=0$ per $i\neq j$). Una
+  volta ottimizzata una direzione, le successive non la ``rovinano'': niente
+  zig-zag. Per $A$ SPD di dimensione $n$, CG raggiunge la soluzione esatta in
+  \textbf{al più $n$ iterazioni}; in pratica ne bastano molte meno e il numero di
+  iterazioni scala come $\sqrt{\mathrm{cond}(A)}$.
+\end{itemize}
 
+\subsection{Un solo prodotto matrice--vettore per iterazione}
+Una scelta implementativa che attraversa tutta la PARTE 2 ma che ha radice
+algoritmica è quella di usare \textbf{un solo} prodotto matrice--vettore per
+iterazione. Per Gradiente e Gradiente coniugato il residuo successivo non viene
+ricalcolato come $\mathbf{b}-A\mathbf{x}^{(k+1)}$ (un secondo matvec), ma ottenuto
+per ricorrenza
+\[
+  \mathbf{r}^{(k+1)} = \mathbf{r}^{(k)} - \alpha_k\, A\mathbf{v},
+\]
+riusando il prodotto $A\mathbf{v}$ già calcolato per determinare il passo. Su
+matrici dense questo dimezza il costo dominante dell'iterazione.
+
+% ==================================================================
+\section{PARTE 2}
+% ==================================================================
+
+\subsection{L'architettura della libreria}
+La libreria che abbiamo sviluppato (file \texttt{solvers.py}) \textbf{non è una
+sequenza di funzioni indipendenti}, ma una piccola gerarchia di classi coesa,
+costruita su un'osservazione: tutti i metodi condividono lo stesso scheletro e
+differiscono \emph{soltanto} nel passo di aggiornamento
+$\mathbf{x}^{(k)}\to\mathbf{x}^{(k+1)}$. L'architettura si articola in questi
+componenti fondamentali:
+
+\begin{enumerate}[leftmargin=1.8em]
+  \item \textbf{Lo scheletro comune.} La classe base astratta
+  \texttt{IterativeSolver} implementa \emph{una sola volta} il metodo
+  \texttt{solve()}: inizializza $\mathbf{x}^{(0)}=\mathbf{0}$, esegue il ciclo che
+  si arresta sul residuo scalato (o al superamento di \texttt{max\_iter}), misura
+  il tempo e costruisce il risultato.
   \begin{lstlisting}
 x^(0) = 0
 finche'  ||b - A x^(k)|| / ||b|| >= tol  e  k < max_iter:
@@ -127,166 +259,113 @@ finche'  ||b - A x^(k)|| / ||b|| >= tol  e  k < max_iter:
     k += 1
   \end{lstlisting}
 
-  \item \textbf{\texttt{\_Iteration}} (interfaccia astratta) incapsula lo stato
-  e il \emph{passo} di un metodo (pattern \emph{template method}). Le quattro
-  classi concrete --- \texttt{Jacobi}, \texttt{GaussSeidel}, \texttt{Gradient},
-  \texttt{ConjugateGradient} --- forniscono soltanto la propria regola di
-  aggiornamento. Aggiungere un quinto metodo significa scrivere una sola classe,
-  senza toccare lo scheletro.
+  \item \textbf{Il passo specifico.} L'interfaccia astratta \texttt{\_Iteration}
+  incapsula lo stato e il \emph{passo} di un metodo (pattern \emph{template
+  method}). Le quattro classi concrete --- \texttt{Jacobi},
+  \texttt{GaussSeidel}, \texttt{Gradient}, \texttt{ConjugateGradient} ---
+  forniscono unicamente la propria regola di aggiornamento. Aggiungere un quinto
+  metodo significa scrivere una sola classe, senza toccare lo scheletro.
 
-  \item \textbf{\texttt{SolverResult}} (dataclass) raccoglie in modo uniforme
-  l'esito: soluzione, iterazioni, tempo, residuo relativo finale, convergenza.
-\end{itemize}
+  \item \textbf{Il risultato uniforme.} La \texttt{dataclass}
+  \texttt{SolverResult} raccoglie in modo omogeneo l'esito di ogni risoluzione:
+  soluzione approssimata, iterazioni, tempo, residuo relativo finale e flag di
+  convergenza.
+\end{enumerate}
 
 Le istanze dei quattro metodi sono raccolte nella tupla \texttt{SOLVERS}, su cui
 iterano sia il runner sia i test. Le parti di servizio comuni sono fattorizzate
-(\texttt{\_validate\_for\_iteration}: matrice quadrata e diagonale non nulla;
-\texttt{\_safe\_norm}: norma di $\mathbf{b}$, calcolata una sola volta).
+una sola volta (\texttt{\_validate\_for\_iteration} per controllare che la matrice
+sia quadrata e con diagonale non nulla; \texttt{\_safe\_norm} per il calcolo della
+norma di $\mathbf{b}$).
 
 \subsection{Note implementative rilevanti}
+L'implementazione degli algoritmi è strutturata attorno a quattro accorgimenti:
+\begin{itemize}[leftmargin=1.6em]
+  \item \textbf{Sparsità preservata.} Nessun metodo fattorizza o modifica $A$: la
+  matrice è impiegata solo per prodotti $A\mathbf{v}$, il cui costo è
+  proporzionale al numero di non-zeri e non a $n^2$ (nessun \emph{fill-in}).
 
-\begin{itemize}[leftmargin=1.4em]
-  \item \textbf{Sparsità preservata.} Nessun metodo fattorizza o modifica $A$:
-  la matrice è usata solo per prodotti $A\mathbf{v}$, il cui costo è
-  proporzionale al numero di non-zeri e non a $n^2$ (niente \emph{fill-in}).
-
-  \item \textbf{Un solo matvec per iterazione.} Per Jacobi, Gradiente e
-  Gradiente coniugato il residuo successivo si ottiene con la ricorrenza
-  $\mathbf{r}^{(k+1)}=\mathbf{r}^{(k)}-\alpha\,A\mathbf{v}$, evitando un
-  prodotto matrice--vettore in più.
+  \item \textbf{Un solo matvec per iterazione.} Come descritto in PARTE 1, per
+  Jacobi, Gradiente e Gradiente coniugato il residuo successivo si ottiene per
+  ricorrenza, evitando un prodotto matrice--vettore aggiuntivo.
 
   \item \textbf{Gauss--Seidel senza inversa, ma veloce.} Il passo
-  $P^{-1}\mathbf{r}$ (con $P=D+L$ triangolare inferiore) è realizzato con una
-  \emph{sweep} in place che aggiorna $\mathbf{x}^{(k+1)}$ riusando i valori
-  appena calcolati --- equivalente a una sostituzione in avanti --- \textbf{senza
-  mai costruire $P^{-1}$}. Essendo intrinsecamente sequenziale ($x_i$ dipende da
-  $x_0,\dots,x_{i-1}$), è compilata con \textbf{numba}
-  (\texttt{\_gauss\_seidel\_sweep}), restando codice nostro: così non è il collo
-  di bottiglia che sarebbe un ciclo Python puro.
+  $P^{-1}\mathbf{r}$ (con $P=D+L$) è realizzato da una \emph{sweep} in place che
+  aggiorna $\mathbf{x}^{(k+1)}$ riusando i valori appena calcolati --- equivalente
+  a una sostituzione in avanti --- \textbf{senza mai costruire $P^{-1}$}. Essendo
+  intrinsecamente sequenziale ($x_i$ dipende da $x_0,\dots,x_{i-1}$), questa sweep
+  è compilata con \textbf{numba} (\texttt{\_gauss\_seidel\_sweep}), restando
+  codice nostro: così non diventa il collo di bottiglia che sarebbe un ciclo
+  Python puro.
 
-  \item \textbf{Tempi equi.} Prima delle misure si esegue un \emph{warm-up} che
-  forza la compilazione JIT, così il tempo di Gauss--Seidel non include il costo
-  (una tantum) di compilazione.
+  \item \textbf{Tempi equi.} Prima delle misure eseguiamo un \emph{warm-up} che
+  forza la compilazione JIT su un problemino $3\times3$, così il tempo riportato
+  per Gauss--Seidel non include il costo (una tantum) di compilazione.
 \end{itemize}
 
+\subsection{Interfaccia da riga di comando}
+Per applicare e mettere a confronto i metodi abbiamo realizzato un eseguibile
+(\texttt{run\_assignment.py}). L'utente può lanciare l'intera validazione su tutte
+le matrici e tolleranze, oppure restringere il calcolo a una specifica matrice
+(\texttt{-{}-matrix}), tolleranza (\texttt{-{}-tol}) o metodo
+(\texttt{-{}-method}), parametri tutti ripetibili. Il software produce un CSV
+numerico con tutte le metriche e tre grafici di sintesi (iterazioni, errore
+relativo e tempo al variare della tolleranza), salvabili in una cartella di
+output configurabile.
+
 % ==================================================================
-\section{Richiamo teorico dei quattro metodi}
+\section{Esperimenti}
 % ==================================================================
-
-Tutti i metodi assumono $A$ \textbf{SPD} ($A=A^{\mathsf{T}}$ e
-$\mathbf{v}^{\mathsf{T}}A\mathbf{v}>0$ per ogni $\mathbf{v}\neq\mathbf{0}$). Il
-residuo è $\mathbf{r}^{(k)}=\mathbf{b}-A\mathbf{x}^{(k)}$ e il criterio di
-arresto è sul residuo scalato $\lVert\mathbf{r}^{(k)}\rVert/\lVert\mathbf{b}
-\rVert<\texttt{tol}$.
-
-\subsection{Metodi stazionari: lo splitting \texorpdfstring{$A=P-N$}{A=P-N}}
-
-Si spezza $A=P-N$ con $P$ facile da invertire; il sistema diventa l'iterazione
+Per ogni matrice abbiamo seguito la procedura di validazione standard richiesta
+dalla traccia: fissata la soluzione esatta nota $\mathbf{x}=[1,1,\dots,1]$, il
+termine noto è $\mathbf{b}=A\mathbf{x}$ (cioè il vettore delle somme di riga di
+$A$), e i quattro metodi partono da $\mathbf{x}^{(0)}=\mathbf{0}$. Avere a
+disposizione la soluzione esatta ci permette di misurare l'\textbf{errore vero}
 \[
-  \mathbf{x}^{(k+1)} = \mathbf{x}^{(k)} + P^{-1}\mathbf{r}^{(k)} .
+  \frac{\lVert\mathbf{x}_{\text{calc}}-\mathbf{x}\rVert}{\lVert\mathbf{x}\rVert},
 \]
-Il metodo converge per ogni $\mathbf{x}^{(0)}$ se e solo se il raggio spettrale
-della \emph{matrice di iterazione} $B=P^{-1}N$ soddisfa $\rho(B)<1$.
+cosa impossibile in un problema reale in cui la soluzione non è nota. Ogni
+configurazione è stata ripetuta alle quattro tolleranze
+$\texttt{tol}\in\{10^{-4},10^{-6},10^{-8},10^{-10}\}$, con
+$\texttt{max\_iter}=20000$.
 
-\begin{itemize}[leftmargin=1.4em]
-  \item \textbf{Jacobi}: $P=D$ (diagonale). $D^{-1}$ è banale (reciproco degli
-  elementi diagonali), il passo è completamente vettoriale e parallelizzabile.
-  La sola SPD \emph{non} garantisce $\rho(B)<1$ (condizione sufficiente: anche
-  $2D-A$ SPD, oppure dominanza diagonale).
-  \item \textbf{Gauss--Seidel}: $P=D+L$ (triangolare inferiore). Usa subito le
-  componenti appena aggiornate: tipicamente \emph{circa metà} delle iterazioni
-  di Jacobi. Se $A$ è SPD, Gauss--Seidel converge \textbf{sempre}. Il passo è
-  una sostituzione in avanti, intrinsecamente sequenziale.
-\end{itemize}
-
-\subsection{Metodi del gradiente: risolvere = minimizzare}
-
-Per $A$ SPD, risolvere $A\mathbf{x}=\mathbf{b}$ equivale a minimizzare
-\[
-  \varphi(\mathbf{y}) = \tfrac12\,\mathbf{y}^{\mathsf{T}}A\mathbf{y}
-                        - \mathbf{b}^{\mathsf{T}}\mathbf{y},
-  \qquad
-  \nabla\varphi(\mathbf{y}) = A\mathbf{y}-\mathbf{b},
-\]
-che si annulla in $A\mathbf{y}=\mathbf{b}$ ed è un minimo (paraboloide a
-``ciotola'') proprio perché $A$ è definita positiva.
-
-\begin{itemize}[leftmargin=1.4em]
-  \item \textbf{Gradiente} (\emph{steepest descent}): direzione $=-\nabla\varphi
-  =\mathbf{r}^{(k)}$, passo ottimo lungo la retta
-  \[
-    \alpha_k = \frac{\mathbf{r}^{(k)}\!\cdot\mathbf{r}^{(k)}}
-                    {\mathbf{r}^{(k)}\!\cdot A\mathbf{r}^{(k)}},
-    \qquad
-    \mathbf{x}^{(k+1)}=\mathbf{x}^{(k)}+\alpha_k\mathbf{r}^{(k)}.
-  \]
-  Converge sempre se $A$ è SPD, ma su matrici mal condizionate la direzione di
-  massima discesa non punta al fondo della valle: si genera il caratteristico
-  \emph{zig-zag} e la velocità dipende dal numero di condizionamento
-  $\mathrm{cond}(A)=\lambda_{\max}/\lambda_{\min}$.
-  \item \textbf{Gradiente coniugato} (CG): direzioni $A$-coniugate
-  ($\mathbf{d}_i^{\mathsf{T}}A\mathbf{d}_j=0$ per $i\neq j$): una volta
-  ottimizzata una direzione non la si ``rovina'' più, niente zig-zag. Per $A$
-  SPD di dimensione $n$, CG raggiunge la soluzione esatta in \textbf{al più $n$
-  iterazioni}; in pratica ne bastano molte meno e il numero di iterazioni scala
-  come $\sqrt{\mathrm{cond}(A)}$.
-\end{itemize}
-
-% ==================================================================
-\section{Metodologia di validazione}
-% ==================================================================
-
-Procedura standard richiesta dalla consegna (step 1--4), per ogni matrice:
-\begin{enumerate}[leftmargin=1.6em]
-  \item soluzione esatta $\mathbf{x}=[1,1,\dots,1]$;
-  \item termine noto $\mathbf{b}=A\mathbf{x}$;
-  \item risoluzione con i quattro metodi a partire da $\mathbf{x}^{(0)}=
-  \mathbf{0}$;
-  \item misura di \textbf{errore relativo} $\lVert\mathbf{x}_{\text{calc}}-
-  \mathbf{x}\rVert/\lVert\mathbf{x}\rVert$, \textbf{iterazioni} e \textbf{tempo}.
-\end{enumerate}
-
-\begin{itemize}[leftmargin=1.4em]
-  \item Tolleranze: $\texttt{tol}\in\{10^{-4},10^{-6},10^{-8},10^{-10}\}$.
-  \item $\texttt{max\_iter}=20000$.
-  \item Criterio di arresto: residuo scalato $\lVert\mathbf{b}-A\mathbf{x}^{(k)}
-  \rVert/\lVert\mathbf{b}\rVert<\texttt{tol}$.
-\end{itemize}
-
-\textbf{Ambiente di calcolo} (lo stesso per tutti i test): Intel Core i7-1165G7
-@ 2.80\,GHz, 16\,GB RAM, Windows 11, Python 3.12, numpy, scipy, numba.
+Le misure di tempo sono state condotte sempre sullo stesso ambiente: Intel Core
+i7-1165G7 @ 2.80\,GHz, 16\,GB RAM, Windows 11, Python 3.12 con numpy, scipy e
+numba.
 
 \subsection{Le matrici di test}
+Le quattro matrici fornite si dividono in due famiglie con caratteristiche
+opposte, come riassunto nella Tabella~\ref{tab:matrici}.
 
 \begin{table}[h]
 \centering
 \caption{Caratteristiche delle matrici di test (autovalori e $\mathrm{cond}(A)$
 stimati con \texttt{analyze\_cond.py}).}
+\label{tab:matrici}
 \begin{tabular}{l r r r r r}
 \toprule
 Matrice & $n$ & non-zeri & $\lambda_{\min}$ & $\lambda_{\max}$ &
 $\mathrm{cond}(A)$ \\
 \midrule
-spa1 & 1000 & 182\,434   & $4.88\cdot10^{-1}$ & $9.99\cdot10^{2}$ & $2.05\cdot10^{3}$ \\
+spa1 & 1000 & 182\,434    & $4.88\cdot10^{-1}$ & $9.99\cdot10^{2}$ & $2.05\cdot10^{3}$ \\
 spa2 & 3000 & 1\,633\,298 & $2.12\cdot10^{0}$  & $3.00\cdot10^{3}$ & $1.41\cdot10^{3}$ \\
-vem1 & 1681 & 13\,385    & $1.23\cdot10^{-2}$ & $4.00\cdot10^{0}$ & $3.25\cdot10^{2}$ \\
-vem2 & 2601 & 21\,225    & $7.89\cdot10^{-3}$ & $4.00\cdot10^{0}$ & $5.07\cdot10^{2}$ \\
+vem1 & 1681 & 13\,385     & $1.23\cdot10^{-2}$ & $4.00\cdot10^{0}$ & $3.25\cdot10^{2}$ \\
+vem2 & 2601 & 21\,225     & $7.89\cdot10^{-3}$ & $4.00\cdot10^{0}$ & $5.07\cdot10^{2}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 Le \texttt{spa*} sono molto più dense ($\approx$180 e $\approx$540 non-zeri per
 riga) e con condizionamento maggiore; le \texttt{vem*} sono molto più sparse
-($\approx$8 non-zeri per riga) e meglio condizionate.
+($\approx$8 non-zeri per riga) e meglio condizionate. Come vedremo, questa
+differenza strutturale si riflette in modo netto sulle prestazioni dei diversi
+metodi.
 
-% ==================================================================
-\section{Risultati}
-% ==================================================================
-
-Tabelle complete estratte da \texttt{results/results.csv}. Tutti i metodi sono
-arrivati a convergenza ($\text{conv}=\text{sì}$) entro $\texttt{max\_iter}=
-20000$. I tempi sono in secondi sull'ambiente indicato (soggetti a variazioni di
-runtime fra esecuzioni).
+\subsection{Risultati numerici}
+Le tabelle seguenti riportano i risultati completi estratti da
+\texttt{results/results.csv}. Tutti i metodi sono arrivati a convergenza
+($\text{conv}=\text{sì}$) entro $\texttt{max\_iter}=20000$. I tempi sono in
+secondi sull'ambiente indicato (soggetti a variazioni di runtime fra esecuzioni).
 
 \begin{table}[h]
 \centering
@@ -410,12 +489,11 @@ $10^{-10}$ & Gradiente coniugato & 74   & $2.25\cdot10^{-11}$ & $5.90\cdot10^{-1
 
 \clearpage
 \subsection{Grafici di sintesi}
-
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.85\textwidth]{results/plots/iterations.png}
-\caption{Numero di iterazioni al variare di \texttt{tol} (asse $y$ in scala
-logaritmica).}
+\caption{Numero di iterazioni al variare di \texttt{tol} (asse $x$ in scala
+logaritmica, una riga per matrice).}
 \end{figure}
 
 \begin{figure}[h]
@@ -432,257 +510,184 @@ logaritmica).}
 \end{figure}
 
 \clearpage
-% ==================================================================
-\section{Commenti}
-% ==================================================================
+\subsection{Discussione comparativa}
+I dati numerici e i grafici restituiscono un quadro coerente con la teoria della
+PARTE 1. Riassumiamo le osservazioni principali.
 
-\textbf{Tutti e quattro i metodi convergono} su tutte le matrici e tutte le
-tolleranze, entro $\texttt{max\_iter}=20000$. Le matrici di test sono quindi
-``trattabili'' anche dai metodi più semplici. Emergono comunque comportamenti
-molto diversi.
-
-\paragraph{1) Gauss--Seidel $\approx$ metà delle iterazioni di Jacobi.}
-È quanto previsto dalla teoria: riusando immediatamente le componenti appena
-calcolate fa più ``lavoro utile'' per iterazione. Es.\ vem2 @$10^{-8}$: Jacobi
-5425 vs Gauss--Seidel 2714 iterazioni (rapporto $\approx2.0$). Il singolo passo
-di Gauss--Seidel è un po' più costoso (sweep sequenziale), perciò sulle matrici
-molto sparse \texttt{vem} i tempi totali dei due metodi si equivalgono, mentre
-sulle \texttt{spa} (dove GS converge in pochissime iterazioni) GS è nettamente
+\paragraph{Gauss--Seidel $\approx$ metà delle iterazioni di Jacobi.}
+È esattamente quanto previsto: riusando immediatamente le componenti appena
+calcolate, Gauss--Seidel fa più ``lavoro utile'' per iterazione. Ad esempio su
+\texttt{vem2} a $\texttt{tol}=10^{-8}$ Jacobi richiede 5425 iterazioni contro le
+2714 di Gauss--Seidel (rapporto $\approx2.0$). Il singolo passo di Gauss--Seidel
+è però un po' più costoso (sweep sequenziale), perciò sulle matrici molto sparse
+\texttt{vem} i tempi totali dei due metodi si equivalgono, mentre sulle
+\texttt{spa} (dove Gauss--Seidel converge in pochissime iterazioni) è nettamente
 il più rapido.
 
-\paragraph{2) Due ``regimi'' opposti tra le famiglie di matrici.}
-I metodi stazionari (Jacobi/Gauss--Seidel) e quelli del gradiente rispondono a
-proprietà diverse della matrice:
-\begin{itemize}[leftmargin=1.4em]
-  \item Su \textbf{spa1/spa2} Jacobi e Gauss--Seidel sono fulminei (5--313
+\paragraph{Due ``regimi'' opposti tra le famiglie di matrici.}
+I metodi stazionari e quelli del gradiente rispondono a proprietà diverse della
+matrice:
+\begin{itemize}[leftmargin=1.6em]
+  \item su \textbf{spa1/spa2} Jacobi e Gauss--Seidel sono fulminei (5--313
   iterazioni), mentre il Gradiente è lentissimo (fino a $\sim$12\,900
   iterazioni). Le \texttt{spa} sono fortemente \emph{dominanti diagonali}
   $\Rightarrow$ raggio spettrale della matrice di iterazione piccolo
   $\Rightarrow$ metodi stazionari rapidi; ma hanno $\mathrm{cond}(A)\approx
   2\cdot10^3$, e la velocità del Gradiente dipende proprio da $\mathrm{cond}(A)$,
-  da cui la lentezza.
-  \item Su \textbf{vem1/vem2} la situazione si riequilibra: meno dominanza
-  diagonale rende Jacobi/Gauss--Seidel più lenti (migliaia di iterazioni),
-  mentre il minore $\mathrm{cond}(A)\approx3$--$5\cdot10^2$ rende il Gradiente
+  da cui la lentezza;
+  \item su \textbf{vem1/vem2} la situazione si riequilibra: la minore dominanza
+  diagonale rende Jacobi/Gauss--Seidel più lenti (migliaia di iterazioni), mentre
+  il minore $\mathrm{cond}(A)\approx3$--$5\cdot10^2$ rende il Gradiente
   competitivo.
 \end{itemize}
-Questo conferma che la velocità di Jacobi/Gauss--Seidel è governata dalla
+Ciò conferma che la velocità di Jacobi/Gauss--Seidel è governata dalla
 \textbf{dominanza diagonale} ($\rho(P^{-1}N)$), mentre quella di
 Gradiente/Gradiente coniugato è governata dal \textbf{numero di
 condizionamento}.
 
-\paragraph{3) Il Gradiente coniugato è il metodo più robusto e regolare.}
-Converge sempre in \textbf{poche decine di iterazioni} (38--240)
+\paragraph{Il Gradiente coniugato è il metodo più robusto e regolare.}
+Converge sempre in \textbf{poche decine di iterazioni} (38--240),
 indipendentemente dalla matrice, con crescita lentissima al ridursi di
 \texttt{tol}. Il numero di iterazioni scala come $\sqrt{\mathrm{cond}(A)}$
-(coerente: spa1, $\mathrm{cond}\approx2\cdot10^3$, richiede più passi di vem1,
-$\mathrm{cond}\approx3\cdot10^2$) ed è sempre ben al di sotto del limite teorico
-di $n$ iterazioni. È il vincitore netto sulle matrici mal condizionate
-\texttt{vem}.
+(coerentemente, \texttt{spa1} con $\mathrm{cond}\approx2\cdot10^3$ richiede più
+passi di \texttt{vem1} con $\mathrm{cond}\approx3\cdot10^2$) e resta sempre ben al
+di sotto del limite teorico di $n$ iterazioni. È il vincitore netto sulle matrici
+mal condizionate \texttt{vem}.
 
-\paragraph{4) Residuo piccolo $\neq$ errore piccolo.}
-A parità di \texttt{tol}, l'errore relativo sulla soluzione \textbf{non} è
-uguale fra i metodi e, per i metodi stazionari, vale circa $\texttt{tol}\times
-\text{cost}$, con cost legato al condizionamento (relazione $\text{errore}
-\lesssim\mathrm{cond}(A)\cdot\text{residuo}$). Esempi a $\texttt{tol}=10^{-6}$:
-su vem2 l'errore è $\sim5\cdot10^{-5}$ (circa 50$\times$ il residuo); su spa1 il
-Gradiente ha errore $\sim10^{-3}$ (circa 1000$\times$ il residuo). Il Gradiente
-coniugato raggiunge invece errori molto più piccoli (fino a $\sim10^{-11}$),
-perché tende a ridurre simultaneamente tutte le componenti spettrali
-dell'errore.
+\paragraph{Residuo piccolo $\neq$ errore piccolo.}
+A parità di \texttt{tol}, l'errore relativo sulla soluzione \textbf{non} è uguale
+fra i metodi e, per quelli stazionari, vale circa $\texttt{tol}\times\text{cost}$,
+con cost legato al condizionamento (relazione
+$\text{errore}\lesssim\mathrm{cond}(A)\cdot\text{residuo}$). Ad esempio a
+$\texttt{tol}=10^{-6}$: su \texttt{vem2} l'errore è $\sim5\cdot10^{-5}$ (circa
+50$\times$ il residuo); su \texttt{spa1} il Gradiente ha errore
+$\sim10^{-3}$ (circa 1000$\times$ il residuo). Il Gradiente coniugato raggiunge
+invece errori molto più piccoli (fino a $\sim10^{-11}$), perché tende a ridurre
+simultaneamente tutte le componenti spettrali dell'errore.
 
-\paragraph{5) Tempi di calcolo.}
-In secondi assoluti il quadro dipende dalla densità:
-\begin{itemize}[leftmargin=1.4em]
-  \item sulle \texttt{spa} (dense) il prodotto matrice--vettore è caro, quindi
-  il Gradiente, che fa molte iterazioni, arriva a oltre 50\,s (spa2
-  @$10^{-10}$), mentre Gauss--Seidel resta sotto 0.3\,s e CG sotto 1.7\,s;
-  \item sulle \texttt{vem} (molto sparse) tutti i metodi sono rapidi
-  ($<1$\,s); CG è comunque il più veloce in assoluto ($\le0.011$\,s) grazie al
-  bassissimo numero di iterazioni.
+\paragraph{Tempi di calcolo.}
+In secondi assoluti il quadro dipende dalla densità della matrice:
+\begin{itemize}[leftmargin=1.6em]
+  \item sulle \texttt{spa} (dense) il prodotto matrice--vettore è caro, quindi il
+  Gradiente, che fa molte iterazioni, arriva a oltre 50\,s (\texttt{spa2} a
+  $10^{-10}$), mentre Gauss--Seidel resta sotto 0.3\,s e CG sotto 1.7\,s;
+  \item sulle \texttt{vem} (molto sparse) tutti i metodi sono rapidi ($<1$\,s); CG
+  è comunque il più veloce in assoluto ($\le0.011$\,s) grazie al bassissimo
+  numero di iterazioni.
 \end{itemize}
 
-In sintesi, su queste matrici il \textbf{Gradiente coniugato è la scelta
-migliore in ogni scenario}; tra i metodi stazionari, Gauss--Seidel domina
-Jacobi; il Gradiente semplice è penalizzato quando la matrice è mal condizionata
-(effetto ``zig-zag'').
+In sintesi, su queste matrici il \textbf{Gradiente coniugato è la scelta migliore
+in ogni scenario}; tra i metodi stazionari, Gauss--Seidel domina Jacobi; il
+Gradiente semplice è penalizzato quando la matrice è mal condizionata (effetto
+``zig-zag'').
 
 % ==================================================================
-\section{Domande d'esame anticipate (Q\&A)}
+\section{Documentazione del codice}
 % ==================================================================
+Il codice è documentato in modo sistematico: ogni modulo ha una docstring di
+intestazione che ne descrive lo scopo, e ogni classe o funzione pubblica ha una
+docstring che ne specifica comportamento, argomenti, valore di ritorno ed
+eccezioni sollevate. Di seguito si riporta la documentazione modulo per modulo.
 
-Raccolta delle domande che il docente può porre all'orale, con risposta
-sintetica e puntatori al codice.
+\subsection{Modulo \texttt{solvers.py}}
+È il cuore della libreria: contiene i quattro metodi e lo scheletro comune.
 
-\subsection{Vincoli della consegna}
+\noindent\textbf{\texttt{SolverResult}} (dataclass). Raccoglie l'esito di una
+risoluzione: \texttt{method} (nome del metodo), \texttt{x} (soluzione
+approssimata), \texttt{iterations}, \texttt{elapsed} (tempo in secondi),
+\texttt{residual\_relative} (residuo scalato finale), \texttt{converged}.
 
-\textbf{Q --- Python è ammesso?}\\
-Sì: la consegna elenca esplicitamente «C++, Fortran, Java, \textbf{Python},
-etc.».
+\noindent\textbf{\texttt{\_Iteration}} (interfaccia astratta). Incapsula lo stato
+di un metodo per un singolo problema. Espone due metodi astratti:
+\texttt{residual\_norm()} (norma euclidea del residuo corrente) e \texttt{step()}
+(aggiornamento $\mathbf{x}^{(k)}\to\mathbf{x}^{(k+1)}$ in place).
 
-\textbf{Q --- Avete usato un solutore già pronto (vietato dalla consegna)?}\\
-No. \texttt{scipy}/\texttt{numpy} sono usati \textbf{solo} per le strutture dati
-(lettura \texttt{.mtx}, matrice sparsa CSR) e le operazioni elementari (prodotto
-matrice--vettore $A\mathbf{x}$, prodotto scalare, norma). I quattro algoritmi
-sono scritti interamente in \texttt{solvers.py}. Non si usano
-\texttt{scipy.sparse.linalg.cg}, \texttt{spsolve}, \texttt{numpy.linalg.solve} o
-simili. È esattamente il caso «la libreria di base fornisce \emph{solamente} la
-struttura dati» richiesto al punto (a).
+\noindent\textbf{\texttt{IterativeSolver}} (classe base astratta). Implementa lo
+scheletro comune.
+\begin{itemize}[leftmargin=1.6em]
+  \item \texttt{solve(A, b, tol, max\_iter=None)}: risolve $A\mathbf{x}=\mathbf{b}$
+  da $\mathbf{x}^{(0)}=\mathbf{0}$, arrestandosi sul residuo scalato o al
+  superamento di \texttt{max\_iter}. \emph{Output}: \texttt{SolverResult}.
+  \emph{Eccezioni}: \texttt{ValueError} se la matrice non è quadrata o ha
+  diagonale nulla.
+  \item \texttt{\_make\_iteration(A, b, x)}: metodo astratto che costruisce
+  l'oggetto iterazione specifico del metodo.
+\end{itemize}
 
-\textbf{Q --- Perché $A\mathbf{x}$ è lecito e un solver no?}\\
-$A\mathbf{x}$ è un'\textbf{operazione elementare} fra matrice e vettore, non la
-\emph{risoluzione} di un sistema. La consegna vieta i metodi che risolvono
-$A\mathbf{x}=\mathbf{b}$, non l'aritmetica di base.
+\noindent\textbf{\texttt{Jacobi} / \texttt{GaussSeidel} / \texttt{Gradient} /
+\texttt{ConjugateGradient}}. Le quattro classi concrete; ciascuna fornisce solo la
+propria regola di aggiornamento tramite la rispettiva classe \texttt{\_Iteration}
+($P=D$ per Jacobi; $P=D+L$ con sweep per Gauss--Seidel; passo ottimo lungo
+$\mathbf{r}$ per il Gradiente; direzioni $A$-coniugate per CG).
 
-\textbf{Q --- Il vettore iniziale è davvero nullo? E il criterio di arresto?}\\
-Sì: $\mathbf{x}^{(0)}=\mathbf{0}$ (\texttt{solvers.py}, riga 97). Il criterio è
-il residuo scalato $\lVert\mathbf{b}-A\mathbf{x}^{(k)}\rVert/\lVert\mathbf{b}
-\rVert<\texttt{tol}$ (riga 104), più il controllo $k<\texttt{max\_iter}$ con
-$\texttt{max\_iter}=20000$ e flag $\texttt{converged}=\text{False}$ se lo si
-supera --- esattamente i punti (b) della consegna.
+\noindent\textbf{\texttt{\_gauss\_seidel\_sweep(indptr, indices, data, diag, b,
+x)}} (compilata con \texttt{@njit}). Esegue una sweep di Gauss--Seidel
+aggiornando \texttt{x} in place (sostituzione in avanti sul formato CSR).
 
-\textbf{Q --- Perché $\mathbf{x}=[1,\dots,1]$ e $\mathbf{b}=A\mathbf{x}$?}\\
-È la procedura di validazione standard richiesta (step 1--4): scegliendo la
-soluzione esatta nota $\mathbf{x}$, si può misurare l'\textbf{errore vero}
-$\lVert\mathbf{x}_{\text{calc}}-\mathbf{x}\rVert/\lVert\mathbf{x}\rVert$, cosa
-impossibile in un problema reale dove la soluzione non si conosce. Nota:
-$\mathbf{b}=A\cdot\mathbf{1}$ è semplicemente il vettore delle \textbf{somme di
-riga} di $A$.
+\noindent\textbf{\texttt{warmup()}}. Forza la compilazione JIT su un problema
+$3\times3$, da chiamare prima delle misure di tempo.
 
-\subsection{Architettura e implementazione}
+\noindent\textbf{\texttt{\_validate\_for\_iteration(A)} / \texttt{\_safe\_norm(x)}}.
+Funzioni di servizio: la prima controlla che $A$ sia quadrata e con diagonale non
+nulla; la seconda restituisce la norma di un vettore, evitando la divisione per
+zero quando $\mathbf{b}=\mathbf{0}$.
 
-\textbf{Q --- Perché non quattro funzioni separate?}\\
-Perché la consegna «valuta positivamente» un'architettura coesa. Tutti i metodi
-condividono lo stesso scheletro (ciclo + criterio d'arresto + misure) e
-differiscono solo nel passo $\mathbf{x}^{(k)}\to\mathbf{x}^{(k+1)}$. Lo
-scheletro è scritto \textbf{una volta sola} in \texttt{IterativeSolver.solve()};
-ogni metodo è una classe con la sola regola di aggiornamento (pattern
-\emph{template method}).
+\subsection{Modulo \texttt{run\_assignment.py}}
+Eseguibile da riga di comando per la validazione.
+\begin{itemize}[leftmargin=1.6em]
+  \item \texttt{main()}: parsa gli argomenti, esegue il \texttt{warmup()}, e per
+  ogni matrice e tolleranza risolve con i metodi selezionati, calcola l'errore
+  relativo e accumula le righe del CSV; salvo \texttt{-{}-no-plots} genera anche i
+  grafici.
+  \item \texttt{parse\_args()}: definisce la CLI (\texttt{-{}-matrix},
+  \texttt{-{}-tol}, \texttt{-{}-method}, \texttt{-{}-max-iter},
+  \texttt{-{}-output}, \texttt{-{}-no-plots}, i primi tre ripetibili).
+  \item \texttt{\_resolve\_matrices} / \texttt{\_select\_solvers}: risolvono
+  rispettivamente l'elenco dei file \texttt{.mtx} (tutta la cartella \texttt{dati}
+  se non specificato) e il sottoinsieme di metodi da usare.
+  \item \texttt{\_write\_csv(rows, path)}: serializza tutte le metriche
+  (matrice, $n$, nnz, tol, metodo, errore relativo, residuo, iterazioni, tempo,
+  convergenza) in \texttt{results/results.csv}.
+\end{itemize}
 
-\textbf{Q --- Perché Gauss--Seidel è compilato con numba e gli altri no?}\\
-Il passo di Gauss--Seidel è una \emph{sweep} sequenziale (sostituzione in
-avanti: $x_i$ dipende da $x_0,\dots,x_{i-1}$ appena calcolati) e quindi
-\textbf{non è vettorizzabile} con numpy: in puro Python sarebbe un ciclo
-lentissimo. numba lo compila a codice macchina mantenendolo \textbf{codice
-nostro} (non è una libreria di solver). Jacobi, Gradiente e CG si esprimono già
-con operazioni vettoriali numpy efficienti.
+\subsection{Moduli \texttt{plot\_results.py} e \texttt{analyze\_cond.py}}
+\noindent\textbf{\texttt{plot\_results.py}}. \texttt{create\_plots(rows,
+output\_dir)} produce i tre grafici (errore relativo, iterazioni, tempo); la
+funzione ausiliaria \texttt{\_plot\_metric} disegna una metrica raggruppando per
+matrice e metodo, con l'asse \texttt{tol} in scala logaritmica e invertito.
 
-\textbf{Q --- Cos'è il warm-up e perché c'è?}\\
-La prima chiamata a una funzione numba paga (una tantum) il costo di
-compilazione JIT. Il \texttt{warmup()} la forza su un problemino $3\times3$
-\textbf{prima} delle misure di tempo, così il tempo riportato per Gauss--Seidel
-non include la compilazione ed è confrontabile con gli altri.
+\noindent\textbf{\texttt{analyze\_cond.py}}. Script a margine (non parte dei
+solutori): stima $\lambda_{\min}$, $\lambda_{\max}$ e $\mathrm{cond}(A)$ per ogni
+matrice tramite \texttt{scipy.sparse.linalg.eigsh}, ai soli fini dei commenti
+della relazione.
 
-\textbf{Q --- Un prodotto matrice--vettore per iterazione: come?}\\
-Per Gradiente e CG il residuo successivo si ottiene per \textbf{ricorrenza}
-$\mathbf{r}^{(k+1)}=\mathbf{r}^{(k)}-\alpha\,(A\mathbf{v})$, riusando il
-prodotto $A\mathbf{v}$ già calcolato per il passo, invece di ricalcolare
-$\mathbf{b}-A\mathbf{x}^{(k+1)}$ (che costerebbe un secondo matvec).
-
-\textbf{Q --- Verificate che la matrice sia davvero SPD?}\\
-No, e va detto onestamente: \texttt{\_validate\_for\_iteration} controlla solo
-che $A$ sia \textbf{quadrata} e con \textbf{diagonale non nulla} (riga 296). La
-simmetria e la definita-positività sono \textbf{assunte} per ipotesi della
-consegna. Se servisse verificarle: la simmetria con $\lVert A-A^{\mathsf{T}}
-\rVert\approx0$; la definita-positività tentando una \textbf{fattorizzazione di
-Cholesky} (riesce $\iff$ SPD) oppure controllando $\lambda_{\min}>0$ (è ciò che
-fa \texttt{analyze\_cond.py}).
-
-\subsection{Teoria dei metodi}
-
-\textbf{Q --- Qual è lo ``splitting'' $A=P-N$ di Jacobi e Gauss--Seidel?}\\
-Jacobi: $P=D$ (diagonale). Gauss--Seidel: $P=D+L$ (triangolare inferiore). In
-entrambi il passo è $\mathbf{x}^{(k+1)}=\mathbf{x}^{(k)}+P^{-1}\mathbf{r}^{(k)}$.
-
-\textbf{Q --- La sola SPD non garantisce la convergenza di Jacobi: perché qui
-converge?}\\
-Vero: Jacobi converge $\iff\rho(D^{-1}(L+U))<1$, e la sola SPD non lo assicura
-(condizione sufficiente: anche $2D-A$ SPD, oppure dominanza diagonale).
-\textbf{Empiricamente} su tutte e quattro le matrici Jacobi converge $\Rightarrow$
-per queste matrici quella condizione è soddisfatta. Gauss--Seidel invece,
-essendo $A$ SPD, converge \textbf{sempre} per teorema.
-
-\textbf{Q --- Risolvere $=$ minimizzare: perché vale solo se $A$ è SPD?}\\
-Perché $\varphi(\mathbf{y})=\tfrac12\mathbf{y}^{\mathsf{T}}A\mathbf{y}-
-\mathbf{b}^{\mathsf{T}}\mathbf{y}$ ha gradiente $\nabla\varphi=A\mathbf{y}-
-\mathbf{b}$, che si annulla in $A\mathbf{y}=\mathbf{b}$; ed è un \textbf{minimo}
-\textbf{solo se $A$ è definita positiva}. Altrimenti $\varphi$ potrebbe avere una
-sella o nessun minimo e i metodi del gradiente non sarebbero ben posti.
-
-\textbf{Q --- Cos'è lo zig-zag del Gradiente e da cosa dipende la sua
-velocità?}\\
-La direzione di massima discesa punta verso la parete più vicina della valle,
-non verso il fondo: su valli strette (mal condizionate) si rimbalza da una
-parete all'altra. La velocità dipende dal \textbf{numero di condizionamento}
-$\mathrm{cond}(A)$. Per questo il Gradiente è lentissimo sulle \texttt{spa}
-($\mathrm{cond}\approx2\cdot10^3$): fino a $\sim$12\,900 iter.
-
-\textbf{Q --- Perché il Gradiente coniugato è così veloce? Direzioni
-A-coniugate?}\\
-Le direzioni sono \textbf{A-coniugate} ($\mathbf{d}_i^{\mathsf{T}}A\mathbf{d}_j
-=0$ per $i\neq j$): una volta ottimizzata una direzione non la si ``rovina''
-più, niente zig-zag. Teorema: per $A$ SPD $n\times n$, CG arriva alla soluzione
-esatta in \textbf{al più $n$ iterazioni}; in pratica, grazie al raggruppamento
-degli autovalori, ne bastano molte meno (qui 38--240). Il numero di iterazioni
-scala come $\sqrt{\mathrm{cond}(A)}$.
-
-\textbf{Q --- Per CG e Gradiente il residuo del criterio d'arresto è quello
-``vero''?}\\
-È il residuo calcolato \textbf{per ricorrenza} ($\mathbf{r}\leftarrow\mathbf{r}-
-\alpha A\mathbf{v}$), non ricalcolato come $\mathbf{b}-A\mathbf{x}$ ad ogni passo
-(scelta per risparmiare un matvec). Su queste matrici e tolleranze la differenza
-con il residuo vero è trascurabile. Jacobi e Gauss--Seidel usano invece il
-residuo vero $\mathbf{b}-A\mathbf{x}$ ad ogni passo.
-
-\subsection{Test ``on-the-fly''}
-
-\textbf{Q --- Sapete lanciare il codice su un'altra matrice / un'altra
-tolleranza all'istante?}\\
-Sì. La CLI accetta \texttt{-{}-matrix} e \texttt{-{}-tol} ripetibili:
-\begin{lstlisting}
-python run_assignment.py --matrix dati/vem1.mtx --tol 1e-8
-python run_assignment.py --matrix /percorso/altra.mtx --tol 1e-5 --tol 1e-7
-\end{lstlisting}
-Si può anche isolare un singolo metodo con \texttt{-{}-method} e saltare i
-grafici con \texttt{-{}-no-plots}. Funziona con qualunque \texttt{.mtx} SPD.
+\subsection{Modulo \texttt{test\_assignment.py}}
+Test automatici: \texttt{test\_scipy\_reads\_matrix\_market} (parser
+MatrixMarket), \texttt{test\_solvers\_on\_tridiagonal\_spd} (convergenza dei
+quattro metodi su una tridiagonale SPD) e
+\texttt{test\_conjugate\_gradient\_is\_fast\_on\_small\_matrix} (CG converge in al
+più $n$ iterazioni su un sistema piccolo).
 
 % ==================================================================
-\section{Come eseguire}
+\appendix
+\section{Codice sorgente}
 % ==================================================================
+Di seguito si riporta il codice sorgente completo dei moduli del progetto. La
+documentazione modulo per modulo è descritta nella Sezione~5.
 
-Requisiti: \texttt{pip install -r requirements.txt} (numpy, scipy, numba,
-matplotlib).
+\subsection{\texttt{solvers.py}}
+\lstinputlisting[style=pyfull]{solvers.py}
 
-\begin{lstlisting}
-# validazione completa (tutte le matrici e tolleranze) -> results/
-python run_assignment.py
+\subsection{\texttt{run\_assignment.py}}
+\lstinputlisting[style=pyfull]{run_assignment.py}
 
-# una matrice / una tolleranza / un metodo specifici
-python run_assignment.py --matrix dati/vem1.mtx --tol 1e-8
-python run_assignment.py --method conjugate-gradient
+\subsection{\texttt{plot\_results.py}}
+\lstinputlisting[style=pyfull]{plot_results.py}
 
-# test automatici
-python test_assignment.py
+\subsection{\texttt{analyze\_cond.py}}
+\lstinputlisting[style=pyfull]{analyze_cond.py}
 
-# stima dei numeri di condizionamento (per i commenti)
-python analyze_cond.py
-\end{lstlisting}
-
-\texttt{run\_assignment.py} rigenera \texttt{results/results.csv} e i grafici in
-\texttt{results/plots/}.
-
-% ==================================================================
-\section{Conclusioni}
-% ==================================================================
-
-La libreria implementa i quattro metodi richiesti con un'architettura coesa
-(classe base con lo scheletro comune $+$ una classe per metodo con la sola
-regola di aggiornamento), rispettando il vincolo di usare la libreria di base
-solo per strutture dati e operazioni elementari. La validazione conferma
-puntualmente la teoria: Gauss--Seidel $\approx2\times$ più rapido di Jacobi in
-iterazioni; velocità dei metodi stazionari legata alla dominanza diagonale e
-quella dei metodi del gradiente al condizionamento; netta superiorità del
-Gradiente coniugato, sempre convergente in poche decine di iterazioni e con gli
-errori più piccoli.
+\subsection{\texttt{test\_assignment.py}}
+\lstinputlisting[style=pyfull]{test_assignment.py}
 
 \end{document}
