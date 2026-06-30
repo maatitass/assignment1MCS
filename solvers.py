@@ -1,33 +1,3 @@
-"""Solutori iterativi per sistemi lineari Ax = b con A simmetrica definita positiva.
-
-ARCHITETTURA
-------------
-La libreria NON e' una sequenza di funzioni indipendenti, ma una piccola
-gerarchia di classi coese, costruita su un'osservazione delle dispense: tutti i
-metodi condividono lo stesso scheletro (Algoritmo 6) e differiscono SOLO nel
-passo di aggiornamento  x^(k) -> x^(k+1).
-
-    IterativeSolver (classe base astratta)
-        |-- implementa UNA volta sola lo scheletro comune in solve():
-        |     x^(0)=0; ciclo con criterio di arresto sul residuo scalato;
-        |     controllo su max_iter; misura del tempo; costruzione del risultato.
-        |
-        |-- Jacobi
-        |-- GaussSeidel
-        |-- Gradient
-        |-- ConjugateGradient
-              ognuna fornisce solo la propria regola di aggiornamento,
-              incapsulata in un oggetto _Iteration (pattern "template method").
-
-Per le STRUTTURE DATI (matrice sparsa CSR, vettori) e le OPERAZIONI ELEMENTARI
-(A@x, prodotto scalare, norma) ci si appoggia a scipy/numpy, come consentito
-dalla consegna. Gli ALGORITMI risolutivi sono implementati interamente qui:
-non si usa alcun solutore di sistemi lineari di scipy/numpy.
-
-Criterio di arresto: residuo scalato  ||b - A x^(k)|| / ||b|| < tol.
-Controllo di sicurezza: arresto con converged=False se si supera max_iter.
-"""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -50,6 +20,7 @@ class SolverResult:
     elapsed: float         # tempo di calcolo in secondi
     residual_relative: float  # ||b - A x||/||b|| raggiunto
     converged: bool        # True se il criterio di arresto e' stato soddisfatto
+    history: list[float] | None = None  # storia del residuo scalato (solo se richiesta)
 
 
 # ---------------------------------------------------------------------------
@@ -83,11 +54,18 @@ class IterativeSolver(ABC):
         """Costruisce l'oggetto iterazione specifico del metodo."""
 
     def solve(self, A: Any, b: np.ndarray, tol: float,
-              max_iter: int | None = None) -> SolverResult:
+              max_iter: int | None = None,
+              record_history: bool = False) -> SolverResult:
         """Risolve Ax = b partendo da x^(0) = 0.
 
         Si arresta quando il residuo scalato scende sotto ``tol`` oppure quando
         si superano ``max_iter`` iterazioni (in tal caso converged=False).
+
+        Se ``record_history=True`` salva in ``SolverResult.history`` il residuo
+        scalato a ogni iterazione (partendo dal valore iniziale = 1). Il valore
+        e' gia' calcolato dal ciclo, quindi non comporta matvec aggiuntivi; va
+        comunque usato SOLO per i grafici di convergenza, NON per le misure di
+        tempo (l'append alla lista introduce un piccolo overhead di Python).
         """
         _validate_for_iteration(A)
         if max_iter is None:
@@ -101,10 +79,13 @@ class IterativeSolver(ABC):
         it = self._make_iteration(A, b, x)
         iterations = 0
         residual_relative = it.residual_norm() / b_norm   # all'inizio vale 1
+        history = [residual_relative] if record_history else None
         while residual_relative >= tol and iterations < max_iter:
             it.step()
             iterations += 1
             residual_relative = it.residual_norm() / b_norm
+            if history is not None:
+                history.append(residual_relative)
         elapsed = perf_counter() - start_time
 
         return SolverResult(
@@ -114,6 +95,7 @@ class IterativeSolver(ABC):
             elapsed=elapsed,
             residual_relative=residual_relative,
             converged=residual_relative < tol,
+            history=history,
         )
 
 

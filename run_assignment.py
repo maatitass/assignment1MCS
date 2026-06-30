@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from scipy.io import mmread
 
-from plot_results import create_plots
+from plots import create_plots
 from solvers import SOLVERS, warmup
 
 

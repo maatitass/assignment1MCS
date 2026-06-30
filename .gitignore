@@ -1,4 +1,12 @@
+# macOS
 .DS_Store
+
+# Claude / strumenti AI
+.claude/
+.aider*
+CLAUDE.local.md
+
+# Python
 __pycache__/
 *.py[cod]
 
